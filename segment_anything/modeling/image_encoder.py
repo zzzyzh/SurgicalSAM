@@ -4,6 +4,8 @@
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
 
+import math
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -17,6 +19,7 @@ from .common import LayerNorm2d, MLPBlock
 class ImageEncoderViT(nn.Module):
     def __init__(
         self,
+        model_type: str = None,
         img_size: int = 1024,
         patch_size: int = 16,
         in_chans: int = 3,
@@ -36,6 +39,7 @@ class ImageEncoderViT(nn.Module):
     ) -> None:
         """
         Args:
+            finetune (str): Finetuning mode
             img_size (int): Input image size.
             patch_size (int): Patch size.
             in_chans (int): Number of input image channels.
@@ -70,8 +74,14 @@ class ImageEncoderViT(nn.Module):
             )
 
         self.blocks = nn.ModuleList()
+        self.model_type = model_type
+        if model_type == 'lora':
+            vit_block = LoraBlock
+        else:
+            vit_block = Block
+        
         for i in range(depth):
-            block = Block(
+            block = vit_block(
                 dim=embed_dim,
                 num_heads=num_heads,
                 mlp_ratio=mlp_ratio,
@@ -182,6 +192,71 @@ class Block(nn.Module):
         return x
 
 
+class LoraBlock(Block):
+    """
+    Transformer blocks with LoRA incorporated in Linear Layer are inherented from Block
+
+    References
+        Customized Segment Anything Model for Medical Image Segmentation        
+        http://arxiv.org/abs/2304.13785
+    
+    Code
+        https://github.com/hitachinsk/SAMed  
+    """
+
+    def __init__(
+        self,
+        dim: int,
+        num_heads: int,
+        mlp_ratio: float = 4.0,
+        qkv_bias: bool = True,
+        norm_layer: Type[nn.Module] = nn.LayerNorm,
+        act_layer: Type[nn.Module] = nn.GELU,
+        use_rel_pos: bool = False,
+        rel_pos_zero_init: bool = True,
+        window_size: int = 0,
+        input_size: Optional[Tuple[int, int]] = None,
+        r: int = 5, # rank for LoRA
+    ) -> None:
+        super().__init__(
+            dim=dim,
+            num_heads=num_heads,
+            mlp_ratio=mlp_ratio,
+            qkv_bias=qkv_bias,
+            norm_layer=norm_layer,
+            act_layer=act_layer,
+            use_rel_pos=use_rel_pos,
+            rel_pos_zero_init=rel_pos_zero_init,
+            window_size=window_size,
+            input_size=input_size,
+        ) 
+        
+        # Replace the original attention with LoraAttention
+        self.attn = LoraAttention(dim,
+                                  num_heads=num_heads,
+                                  qkv_bias=qkv_bias,
+                                  use_rel_pos=use_rel_pos,
+                                  rel_pos_zero_init=rel_pos_zero_init,
+                                  input_size=input_size if window_size == 0 else (window_size, window_size),
+                                  window_size=window_size,
+                                  r=r,
+                                  )
+        
+        self._reset_parameters()
+                     
+    def _reset_parameters(self) -> None:
+        nn.init.kaiming_uniform_(self.attn.lora_linear_a_q.weight, a=math.sqrt(5))
+        nn.init.kaiming_uniform_(self.attn.lora_linear_a_v.weight, a=math.sqrt(5))
+        nn.init.zeros_(self.attn.lora_linear_b_q.weight)
+        nn.init.zeros_(self.attn.lora_linear_b_v.weight)
+            
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+
+        x = super().forward(x)
+
+        return x
+
+
 class Attention(nn.Module):
     """Multi-head Attention block with relative position embeddings."""
 
@@ -239,6 +314,67 @@ class Attention(nn.Module):
 
         return x
 
+
+class LoraAttention(Attention):
+    """Multi-head Attention block enhanced with LoRA."""
+    
+    def __init__(self,        
+                 dim: int,
+                 num_heads: int = 8,
+                 qkv_bias: bool = True,
+                 use_rel_pos: bool = False,
+                 rel_pos_zero_init: bool = True,
+                 input_size: Optional[Tuple[int, int]] = None,
+                 window_size: int = 0,
+                 r: int = 5, # Rank for LoRA adaptation                 
+                 ):
+        
+        super().__init__(            
+            dim,
+            num_heads=num_heads,
+            qkv_bias=qkv_bias,
+            use_rel_pos=use_rel_pos,
+            rel_pos_zero_init=rel_pos_zero_init,
+            input_size=input_size if window_size == 0 else (window_size, window_size),
+        )
+                
+        self.dim = self.qkv.in_features
+
+        # LoRA-specific parameters
+        self.lora_linear_a_q = nn.Linear(self.dim, r, bias=False)
+        self.lora_linear_b_q = nn.Linear(r, self.dim, bias=False)
+        self.lora_linear_a_v = nn.Linear(self.dim, r, bias=False)
+        self.lora_linear_b_v = nn.Linear(r, self.dim, bias=False)
+        
+    def _lora_qkv(self, x):
+        qkv = self.qkv(x)  # B,N,N,3*org_C
+        q, k, v = qkv.chunk(3, dim=-1)
+        
+        lora_q = q + self.lora_linear_b_q(self.lora_linear_a_q(x))
+        lora_v = v + self.lora_linear_b_v(self.lora_linear_a_v(x))
+        
+        lora_qkv = torch.cat((lora_q, k, lora_v), dim=-1)
+
+        return lora_qkv
+
+    def forward(self, x):
+        B, H, W, _ = x.shape
+        # qkv with shape (3, B, nHead, H * W, C)
+        qkv = self._lora_qkv(x).reshape(B, H * W, 3, self.num_heads, -1).permute(2, 0, 3, 1, 4)
+        # q, k, v with shape (B * nHead, H * W, C)
+        q, k, v = qkv.reshape(3, B * self.num_heads, H * W, -1).unbind(0)
+
+        attn = (q * self.scale) @ k.transpose(-2, -1)
+
+        if self.use_rel_pos:
+            attn = add_decomposed_rel_pos(attn, q, self.rel_pos_h, self.rel_pos_w, (H, W), (H, W))
+
+        attn = attn.softmax(dim=-1)
+        x = (attn @ v).view(B, self.num_heads, H, W, -1).permute(0, 2, 3, 1, 4).reshape(B, H, W, -1)
+        x = self.proj(x)
+
+        return x
+    
 
 def window_partition(x: torch.Tensor, window_size: int) -> Tuple[torch.Tensor, Tuple[int, int]]:
     """
