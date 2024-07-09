@@ -47,7 +47,7 @@ def get_args():
     # Training Strategy
     parser.add_argument('--scale', type=float, default=0.1, help='percentage of training data')
     parser.add_argument('--num_epochs', type=int, default=300, help='the num of epochs')
-    parser.add_argument('--batch_size', type=int, default=16)
+    parser.add_argument('--batch_size', type=int, default=8)
     parser.add_argument('--num_workers', type=int, default=16)
     parser.add_argument('--image_size', type=int, default=512, help='image size')
     parser.add_argument('--resolution', type=int, default=512, choices=[256, 512], help='input size of the model')
@@ -58,7 +58,7 @@ def get_args():
     parser.add_argument('--num_tokens', type=int, default=4, help='the num of prompts') 
     parser.add_argument('--vis', type=bool, default=False, help='whether to visualise results')
     
-    parser.add_argument('--debug', type=bool, default=False, help='whether to use debug mode')
+    parser.add_argument('--debug', type=bool, default=True, help='whether to use debug mode')
 
 
     args = parser.parse_args()

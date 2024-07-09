@@ -56,7 +56,7 @@ class Few_Shot_SAM(nn.Module):
     def forward(self, images, gts, mode='train'):
         prototypes = self.learnable_prototypes_model() # [cls, 256]
 
-        image_embeddings, _ = self.image_encoder(images) # [b, 256, 32, 32]
+        image_embeddings = self.image_encoder(images) # [b, 256, 32, 32]
         image_embeddings = rearrange(image_embeddings, 'b c h w -> b (h w) c')
         
         cls_ids = []
@@ -83,6 +83,7 @@ class Few_Shot_SAM(nn.Module):
                 image_pe=self.prompt_encoder.get_dense_pe(),  # [1, 256, feat_size, feat_size]
                 sparse_prompt_embeddings=sparse_embedding, # [1, num_cls*num_tokens, 256]
                 dense_prompt_embeddings=dense_embedding,  # [1, 256, feat_size, feat_size]
+                multimask_output=False,
             )
             low_res_masks_list.append(low_res_mask)
             iou_predictions_list.append(iou_prediction)

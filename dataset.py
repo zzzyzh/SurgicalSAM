@@ -57,7 +57,6 @@ class TrainingDataset(Dataset):
         mask = cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE)
         
         image = Image.fromarray(image)
-        mask = np.uint8(mask == 255)
         mask = Image.fromarray(mask)
         
         image, mask = self.augmentation(image, mask, rotate_angle=30, colour_factor=0.4)
@@ -190,7 +189,8 @@ if __name__ == '__main__':
     for epoch in range(30):
         tbar = tqdm((train_dataloader), total = len(train_dataloader), leave=False)
         for batch_input in tbar:
-            print('yes')
+            masks = batch_input['masks']
+            print(torch.max(masks))
 
         
     
