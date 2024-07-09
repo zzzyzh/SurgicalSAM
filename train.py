@@ -195,10 +195,10 @@ def train(args):
             images = batch_input['images'].cuda()
             images = F.interpolate(images, (resolution, resolution), mode='bilinear', align_corners=False)  
             
-            outputs1, outputs2, prototypes, class_embeddings, cls_ids = model(images, masks, mode='train')
+            outputs, prototypes, class_embeddings, cls_ids = model(images, masks, mode='train')
             
             # compute loss     
-            seg_loss = 0
+            seg_loss = dice_loss_model(outputs['preds'], masks.squeeze(1).to(torch.long))
             contrastive_loss = contrastive_loss_model(prototypes, torch.tensor([i for i in range(1, prototypes.size()[0] + 1)]).cuda(), ref_emb=class_embeddings, ref_labels=cls_ids)
             loss = seg_loss + contrastive_loss
 
@@ -233,15 +233,16 @@ def train(args):
                 images = batch_input['images'].cuda()
                 images = F.interpolate(images, (resolution, resolution), mode='bilinear', align_corners=False)
                 
-                outputs1, outputs2, _, _, _ = model(images, masks, mode='test')
-                preds = (outputs1['preds'] + outputs2['preds'])/2
+                outputs, _, _, _ = model(images, masks, mode='test')
+                preds = outputs['preds'] 
                 preds = torch.argmax(torch.softmax(preds, dim=1), dim=1).squeeze(0) # [b, 512, 512]
 
                 for pred, im_name in zip(preds, mask_names):
                     val_masks[im_name] = np.array(pred.detach().cpu())
             
                 # compute loss                 
-                val_seg_loss
+                val_seg_loss = dice_loss_model(outputs['preds'], masks.squeeze(1).to(torch.long))
+
                 vbar.set_description(f'Val Epoch [{epoch+1}/{num_epochs}]')
 
         loggers.info(f'Validation - Epoch: {epoch+1}/{num_epochs}; Average Val Loss: {val_seg_loss/len(val_dataloader)}')

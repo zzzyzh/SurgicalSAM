@@ -18,7 +18,7 @@ from utils.cal_metrics import eval_metrics
 def get_args():
     print('======> Process Arguments')
     parser = argparse.ArgumentParser()
-    parser.add_argument('--run_name', type=str, default='fsh_sam_prototype')
+    parser.add_argument('--run_name', type=str, default='prototype_sam')
     
     # Set-up Model
     parser.add_argument('--task', type=str, default='ven', help='specify task')
@@ -134,8 +134,8 @@ def test(args):
             images = batch_input['images'].cuda()
             images = F.interpolate(images, (resolution, resolution), mode='bilinear', align_corners=False)
             
-            outputs1, outputs2, _, _, _ = model(images, masks, mode='test')
-            preds = (outputs1['preds'] + outputs2['preds'])/2
+            outputs, _, _, _ = model(images, masks, mode='test')
+            preds = outputs['preds'] 
             preds = torch.argmax(torch.softmax(preds, dim=1), dim=1).squeeze(0) # [b, 512, 512]
 
             for pred, im_name in zip(preds, mask_names):
