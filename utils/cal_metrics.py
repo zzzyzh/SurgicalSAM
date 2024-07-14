@@ -1,5 +1,6 @@
 import numpy as np 
 import torch 
+from medpy import metric
 
 
 def eval_metrics(eval_masks, gt_eval_masks, num_classes=4):
@@ -128,3 +129,17 @@ def compute_mask_IU_eval(masks, target):
     intersection = temp.sum()
     union = ((masks + target) - temp).sum()
     return intersection, union
+
+
+def compute_hd95(pred, gt):
+    pred[pred > 0] = 1
+    gt[gt > 0] = 1
+    
+    pred = np.array(pred)
+    gt = np.array(gt)
+    
+    if pred.sum() > 0 and gt.sum() > 0:
+        hd95 = metric.binary.hd95(pred, gt)
+        return hd95
+    else:
+        return 0

@@ -12,7 +12,7 @@ from torch.nn import functional as F
 from dataset import TestingDataset
 from model import Few_Shot_SAM
 from utils.utils import create_masks, read_gt_masks, get_logger, vis_pred
-from utils.cal_metrics import eval_metrics
+from utils.cal_metrics import eval_metrics, compute_hd95
 
 
 def get_args():
@@ -147,6 +147,16 @@ def test(args):
       
     loggers.info(f'IoU_Results: {iou_results};')
     loggers.info(f'Dice_Results: {dice_results}.')
+    
+    if volume:
+        metric_hd95 = []
+        for i in range(1, num_classes+1):
+            metric_cls_hd95 = []
+            for key in val_masks.keys():   
+                metric_cls_hd95.append(compute_hd95(val_masks[key]==i, gt_masks[key]==i))
+            metric_hd95.append(np.mean(metric_cls_hd95, axis=0))
+        hd95 = np.mean(metric_hd95, axis=0)
+        loggers.info(f'HD95: {round(hd95, 2)}.')
     
     if vis and not volume:
         vis_pred(val_masks, gt_masks, save_pred_dir, num_classes)

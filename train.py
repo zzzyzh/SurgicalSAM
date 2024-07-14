@@ -58,7 +58,7 @@ def get_args():
     parser.add_argument('--num_tokens', type=int, default=4, help='the num of prompts') 
     parser.add_argument('--vis', type=bool, default=False, help='whether to visualise results')
     
-    parser.add_argument('--debug', type=bool, default=True, help='whether to use debug mode')
+    parser.add_argument('--debug', type=bool, default=False, help='whether to use debug mode')
 
 
     args = parser.parse_args()
