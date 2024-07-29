@@ -74,8 +74,9 @@ class Few_Shot_SAM(nn.Module):
         sam_feats = torch.concat(sam_feats, dim=0) # [b', 1024, 256]
         cls_embeddings = cal_cls_embedding(sam_feats, gts, feat_list, self.feat_size)
         
-        sam_feats, dense_embeddings, sparse_embeddings = self.prototype_prompt_encoder(sam_feats, prototypes, cls_ids)
-        
+        _, dense_embeddings, sparse_embeddings = self.prototype_prompt_encoder(sam_feats, prototypes, cls_ids)
+        sam_feats = rearrange(sam_feats, 'b (h w) c -> b c h w', h=self.feat_size, w=self.feat_size)
+  
         low_res_masks_list, iou_predictions_list = [], []
         for dense_embedding, sparse_embedding, features_per_image in zip(dense_embeddings.unsqueeze(1), sparse_embeddings.unsqueeze(1), sam_feats):
             low_res_mask, iou_prediction = self.mask_decoder(

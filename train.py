@@ -46,7 +46,7 @@ def get_args():
 
     # Training Strategy
     parser.add_argument('--scale', type=float, default=0.1, help='percentage of training data')
-    parser.add_argument('--num_epochs', type=int, default=300, help='the num of epochs')
+    parser.add_argument('--num_epochs', type=int, default=500, help='the num of epochs')
     parser.add_argument('--batch_size', type=int, default=8)
     parser.add_argument('--num_workers', type=int, default=16)
     parser.add_argument('--image_size', type=int, default=512, help='image size')
@@ -54,7 +54,7 @@ def get_args():
     parser.add_argument('--optimizer', type=str, default='adam', choices=['adam', 'sgd', 'adamw'], help='')
     parser.add_argument('--dice_weight', type=float, default=0.8)
     parser.add_argument('--lr', type=float, default=1e-4, help='learning rate')
-    parser.add_argument('--weight_decay', type=float, default=1e-4, help='learning rate')
+    parser.add_argument('--weight_decay', type=float, default=1e-3, help='learning rate')
     parser.add_argument('--num_tokens', type=int, default=4, help='the num of prompts') 
     parser.add_argument('--vis', type=bool, default=False, help='whether to visualise results')
     
@@ -161,7 +161,7 @@ def train(args):
     print('======> Define Optmiser and Loss')
     dice_loss_model = DiceLoss().cuda()
     # focal_loss_model = FocalLoss().cuda()
-    contrastive_loss_model = losses.NTXentLoss(temperature=0.05).cuda()
+    contrastive_loss_model = losses.NTXentLoss(temperature=0.07).cuda()
     
     lr = args.lr
     weight_decay = args.weight_decay
@@ -187,7 +187,7 @@ def train(args):
         
         # training 
         model.train()
-        train_loss, train_seg_loss, train_seg_loss1, train_seg_loss2, train_contrastive_loss = 0, 0, 0, 0, 0
+        train_loss, train_seg_loss, train_contrastive_loss = 0, 0, 0
         tbar = tqdm((train_dataloader), total = len(train_dataloader), leave=False)
 
         for batch_input in tbar: 
