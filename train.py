@@ -181,7 +181,7 @@ def train(args):
     loggers.info('model_total_params:' + str(model_total_params))
     
     print('======> Start Training and Validation' )
-    best_challenge_iou_val = -100.0
+    best_dice_val = -100.0
     
     for epoch in range(num_epochs):   
         
@@ -260,11 +260,11 @@ def train(args):
             os.makedirs(save_epoch_dir, exist_ok=True)
             vis_pred(val_masks, gt_masks, save_epoch_dir, num_classes)
         
-        if iou_results['challengIoU'] > best_challenge_iou_val:
-            best_challenge_iou_val = iou_results['challengIoU']
+        if dice_results['Dice'] > best_dice_val:
+            best_dice_val = dice_results['Dice']
             torch.save(model.state_dict(), osp.join(save_ckpt_dir, f'{task}_ckpt.pth'))
 
-            loggers.info(f'Best Challenge IoU: {best_challenge_iou_val:.4f} at Epoch {epoch+1}')        
+            loggers.info(f'Best Dice: {best_dice_val:.4f} at Epoch {epoch+1}')        
 
     writer.close()      
     

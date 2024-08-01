@@ -17,8 +17,6 @@ from scipy import ndimage
 from scipy.ndimage import zoom
 from scipy.ndimage import gaussian_filter, map_coordinates
 
-from utils.augmentation import RandomAffine, ElasticTransform
-
 
 BHX_TRAIN_LIST = [str(i).zfill(4) for i in range(600)]
 SABS_TRAIN_LIST = ["0005", "0006", "0007", "0009", "00010", "0021", "0023", "0024", "0026", "0027", "0028", "0030", "0031", "0033", "0034", "0037", "0039", "0040"]
