@@ -3,37 +3,19 @@ import os.path as osp
 import logging
 from tqdm import tqdm
 
-from PIL import Image
-import SimpleITK as sitk
 import cv2 
 import numpy as np 
 import torch 
 import matplotlib.pyplot as plt
 
 
+# bhx
+BHX_TEST_VOLUME = [str(i).zfill(4) for i in range(701, 801)]
 # sabs
-PART_TEST_VOLUME = ["0029", "0003", "0001", "0004", "0025", "0035"] # reference: https://github.com/Beckschen/TransUNet
+SABS_TEST_VOLUME = ["0018", "0002", "0000", "0003", "0014", "0024"]
 
 
-def save_array_as_nii_volume(data, spacing_raw):
-    euler3d = sitk.Euler3DTransform()
-    img = sitk.GetImageFromArray(data)
-    img.SetSpacing((spacing_raw[2], spacing_raw[3], spacing_raw[1]))
-    xsize, ysize, zsize = img.GetSize()
-    xspacing, yspacing, zspacing = img.GetSpacing()
-    origin = img.GetOrigin()
-    direction = img.GetDirection()
-
-    spacing = [1, 1, 1.2]
-
-    new_size = (
-        int(xsize * xspacing / spacing[0]), int(ysize * yspacing / spacing[1]), int(zsize * zspacing / spacing[2]))
-    img = sitk.Resample(img, new_size, euler3d, sitk.sitkNearestNeighbor, origin, spacing, direction)
-
-    return img
-
-
-def read_gt_masks(data_root_dir="/home/yanzhonghao/data/ven/bhx_sammed", mode="val", cls_id=0, mask_size=512, volume=False):   
+def read_gt_masks(data_root_dir="../../data/ven/bhx_sammed", mode="val", cls_id=0, mask_size=512, volume=False):   
     """Read the annotation masks into a dictionary to be used as ground truth in evaluation.
 
     Returns:
@@ -52,35 +34,24 @@ def read_gt_masks(data_root_dir="/home/yanzhonghao/data/ven/bhx_sammed", mode="v
             gt_eval_masks[mask_name] = mask
     else:
         if 'bhx' in data_root_dir:
-            spacing_list = np.loadtxt(f'{data_root_dir}/{mode}/spacing.txt', delimiter=',', dtype=float).tolist()
-            for _, spacing in enumerate(tqdm(spacing_list)):
-                id = str(int(spacing[0])).zfill(4)
-                mask_as_png = np.zeros([40, mask_size, mask_size], dtype='uint8')
-                for mask_name in sorted(os.listdir(gt_eval_masks_path)):
-                    if f'{id}_' in mask_name:
-                        mask = cv2.imread(osp.join(gt_eval_masks_path, mask_name), 0)
-                        mask = cv2.resize(mask, (mask_size, mask_size), interpolation=cv2.INTER_NEAREST)
-                        if cls_id != 0:
-                            mask[mask != cls_id] = 0
-                        mask = Image.fromarray(mask)
-                        i = int(mask_name.split('.')[0].split('_')[-1])
-                        mask_as_png[i, :, :] = mask
-                np.transpose(mask_as_png, [2, 0, 1])
-                mask_as_nii = save_array_as_nii_volume(mask_as_png, spacing)
-                gt_eval_masks[id] = torch.tensor(sitk.GetArrayFromImage(mask_as_nii))
+            test_volume = BHX_TEST_VOLUME
+            test_len = 40
         elif 'sabs' in data_root_dir:
-            for id in tqdm(PART_TEST_VOLUME):
-                mask_as_png = np.zeros([200, mask_size, mask_size], dtype='uint8')
-                for mask_name in sorted(os.listdir(gt_eval_masks_path)):
-                    if f'{id}_' in mask_name:
-                        mask = cv2.imread(osp.join(gt_eval_masks_path, mask_name), 0)
-                        mask = cv2.resize(mask, (mask_size, mask_size), interpolation=cv2.INTER_NEAREST)
-                        if cls_id != 0:
-                            mask[mask != cls_id] = 0
-                        i = int(mask_name.split('.')[0].split('_')[-1])
-                        mask_as_png[i, :, :] = mask
+            test_volume = SABS_TEST_VOLUME
+            test_len = 200
+        
+        for id in tqdm(test_volume):
+            mask_as_png = np.zeros([test_len, mask_size, mask_size], dtype='uint8')
+            for mask_name in sorted(os.listdir(gt_eval_masks_path)):
+                if f'{id}_' in mask_name:
+                    mask = cv2.imread(osp.join(gt_eval_masks_path, mask_name), 0)
+                    mask = cv2.resize(mask, (mask_size, mask_size), interpolation=cv2.INTER_NEAREST)
+                    if cls_id != 0:
+                        mask[mask != cls_id] = 0
+                    i = int(mask_name.split('.')[0].split('_')[-1])
+                    mask_as_png[i, :, :] = mask
 
-                gt_eval_masks[id] = torch.tensor(mask_as_png)
+            gt_eval_masks[id] = torch.tensor(mask_as_png)
                 
     return gt_eval_masks
   
@@ -91,25 +62,19 @@ def create_masks(data_root_dir, val_masks, mask_size, mode='test', volume=False)
     else:
         eval_masks = dict()
         if 'bhx' in data_root_dir:
-            spacing_list = np.loadtxt(f'{data_root_dir}/{mode}/spacing.txt', delimiter=',', dtype=float).tolist()
-            for _, spacing in enumerate(tqdm(spacing_list)):
-                id = str(int(spacing[0])).zfill(4)
-                mask_as_png = np.zeros([40, mask_size, mask_size], dtype='uint8')
-                for mask_name, mask in val_masks.items():
-                    if id in mask_name:
-                        i = int(mask_name.split('.')[0].split('_')[-1])
-                        mask_as_png[i, :, :] = mask.astype(np.uint8)
-                np.transpose(mask_as_png, [2, 0, 1])
-                mask_as_nii = save_array_as_nii_volume(mask_as_png, spacing)
-                eval_masks[id] = sitk.GetArrayFromImage(mask_as_nii)  
+            test_volume = BHX_TEST_VOLUME
+            test_len = 40
         elif 'sabs' in data_root_dir:
-            for id in tqdm(PART_TEST_VOLUME):
-                mask_as_png = np.zeros([200, mask_size, mask_size], dtype='uint8')
-                for mask_name, mask in val_masks.items():
-                    if id in mask_name:
-                        i = int(mask_name.split('.')[0].split('_')[-1])
-                        mask_as_png[i, :, :] = mask.astype(np.uint8)
-                eval_masks[id] = mask_as_png      
+            test_volume = SABS_TEST_VOLUME
+            test_len = 200
+
+        for id in tqdm(test_volume):
+            mask_as_png = np.zeros([test_len, mask_size, mask_size], dtype='uint8')
+            for mask_name, mask in val_masks.items():
+                if id in mask_name:
+                    i = int(mask_name.split('.')[0].split('_')[-1])
+                    mask_as_png[i, :, :] = mask.astype(np.uint8)
+            eval_masks[id] = mask_as_png    
              
     return eval_masks
 
@@ -135,18 +100,27 @@ def get_logger(filename, write_mode="w", verbosity=1, name=None):
     return logger
 
 
-def vis_pred(pred_dict, gt_dict, save_dir, num_classes):    
+CLASS2COLOR = {
+    0: (0, 0, 0),
+    1: (255, 124, 116),
+    2: (223, 120, 242),
+    3: (0, 176, 0),
+    4: (0, 108, 240),
+    5: (239, 209, 207),
+    6: (167, 245, 155),
+    7: (255, 113, 165),
+    8: (255, 172, 168),
+    9: (235, 168, 233),
+    10: (209, 209, 209),
+}
+
+
+def vis_pred(pred_dict, gt_dict, save_dir, dataset_name):    
     
-    color_mapping = {
-        1: (11, 158, 150),   
-        2: (27, 0, 255),     
-        3: (255, 0, 255),     
-        4: (241, 156, 118),    
-        5: (27, 255, 255),    
-        6: (227, 0, 127),    
-        7: (255, 255, 0),    
-        8: (0, 255, 0)     
-    }
+    if dataset_name == 'bhx_sammed':
+        color_mapping = {i: CLASS2COLOR[i] for i in range(1, 5)}
+    elif dataset_name == 'sabs_sammed' or 'sabs_sammed_roi':
+        color_mapping = {i: CLASS2COLOR[i] for i in range(1, 9)}
 
     for _, mask_name in enumerate(tqdm(list(pred_dict.keys()))):
         pred = np.array(pred_dict[mask_name])  # [256, 256]
@@ -177,8 +151,6 @@ def vis_pred(pred_dict, gt_dict, save_dir, num_classes):
         
         plt.savefig(os.path.join(save_dir, mask_name))
         plt.close()
-
-
 
         
 if __name__ == '__main__':

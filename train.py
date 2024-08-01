@@ -247,7 +247,7 @@ def train(args):
 
         loggers.info(f'Validation - Epoch: {epoch+1}/{num_epochs}; Average Val Loss: {val_seg_loss/len(val_dataloader)}')
 
-        iou_results, dice_results = eval_metrics(val_masks, gt_masks, num_classes)
+        iou_results, dice_results, _, _ = eval_metrics(val_masks, gt_masks, num_classes)
                 
         loggers.info(f'Validation - Epoch: {epoch+1}/{num_epochs};')   
         loggers.info(f'IoU_Results: {iou_results};')

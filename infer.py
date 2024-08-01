@@ -3,10 +3,11 @@ import os.path as osp
 import random 
 import argparse
 from tqdm import tqdm
+import csv
 
 import numpy as np 
 import torch 
-from torch.utils.data import DataLoader, Subset
+from torch.utils.data import DataLoader
 from torch.nn import functional as F
 
 from dataset import TestingDataset
@@ -143,11 +144,14 @@ def test(args):
         
     gt_masks = read_gt_masks(data_root_dir=data_root_dir, mode='test', cls_id=cls, mask_size=image_size, volume=volume)
     val_masks = create_masks(data_root_dir, val_masks, image_size, mode='test', volume=volume)
-    iou_results, dice_results = eval_metrics(val_masks, gt_masks, num_classes)
-      
+    iou_results, dice_results, iou_csv, dice_csv = eval_metrics(val_masks, gt_masks, num_classes)
     loggers.info(f'IoU_Results: {iou_results};')
     loggers.info(f'Dice_Results: {dice_results}.')
-    
+    with open(os.path.join(save_log_dir, 'results_volume.csv' if volume else 'results.csv'), 'w', newline='') as file:
+        writer = csv.writer(file)
+        writer.writerow(iou_csv)
+        writer.writerow(dice_csv)
+        
     if volume:
         metric_hd95 = []
         for i in range(1, num_classes+1):
