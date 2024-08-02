@@ -19,7 +19,7 @@ from scipy.ndimage import gaussian_filter, map_coordinates
 
 
 BHX_TRAIN_LIST = [str(i).zfill(4) for i in range(600)]
-SABS_TRAIN_LIST = ["0005", "0006", "0007", "0009", "00010", "0021", "0023", "0024", "0026", "0027", "0028", "0030", "0031", "0033", "0034", "0037", "0039", "0040"]
+SABS_TRAIN_LIST = ["0004", "0005", "0006", "0008", "0009", "0010", "0012", "0013", "0015", "0016", "0017", "0019", "0020", "0022", "0023", "0026", "0028", "0029"]
 
 
 class TrainingDataset(Dataset):
@@ -82,7 +82,7 @@ class TrainingDataset(Dataset):
         slice_idx = random.sample(pat_idx, math.ceil(len(pat_list)*scale))
 
         return sorted(slice_idx)
-        
+    
     def augmentation(
             self, 
             image, 
