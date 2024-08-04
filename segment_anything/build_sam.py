@@ -15,10 +15,8 @@ from .modeling import ImageEncoderViT, MaskDecoder, PromptEncoder, Sam, TwoWayTr
 
 def build_sam_vit_h(checkpoint=None, model_type=None, image_size=512, num_classes=8):
     if model_type:
-        use_image_encoder = False if model_type == 'wo_encoder' else True
         return _build_lora_sam_hier(
             model_type=model_type,
-            use_image_encoder=use_image_encoder,
             encoder_embed_dim=1280,
             encoder_depth=32,
             encoder_num_heads=16,
@@ -39,10 +37,8 @@ def build_sam_vit_h(checkpoint=None, model_type=None, image_size=512, num_classe
 
 def build_sam_vit_l(checkpoint=None, model_type=None, image_size=512, num_classes=8):
     if model_type:
-        use_image_encoder = False if model_type == 'wo_encoder' else True
         return _build_lora_sam_hier(
             model_type=model_type,
-            use_image_encoder=use_image_encoder,
             encoder_embed_dim=1024,
             encoder_depth=24,
             encoder_num_heads=16,
@@ -63,10 +59,8 @@ def build_sam_vit_l(checkpoint=None, model_type=None, image_size=512, num_classe
 
 def build_sam_vit_b(checkpoint=None, model_type=None, image_size=512, num_classes=8):
     if model_type:
-        use_image_encoder = False if model_type == 'wo_encoder' else True
         return _build_lora_sam_hier(
             model_type=model_type,
-            use_image_encoder=use_image_encoder,
             encoder_embed_dim=768,
             encoder_depth=12,
             encoder_num_heads=12,
