@@ -16,9 +16,9 @@ from torch.utils.data import DataLoader, Subset
 from torch.utils.tensorboard import SummaryWriter
 
 from dataset import TrainingDataset, TestingDataset
-from model import Few_Shot_SAM
+from model import Few_Shot_SAM, cal_cls_embedding
 from utils.utils import read_gt_masks, get_logger, vis_pred
-from utils.loss import DiceLoss, FocalLoss, cal_loss
+from utils.loss import DiceLoss
 from pytorch_metric_learning import losses
 from utils.cal_metrics import eval_metrics
 
@@ -46,7 +46,7 @@ def get_args():
 
     # Training Strategy
     parser.add_argument('--scale', type=float, default=0.1, help='percentage of training data')
-    parser.add_argument('--num_epochs', type=int, default=500, help='the num of epochs')
+    parser.add_argument('--num_epochs', type=int, default=200, help='the num of epochs')
     parser.add_argument('--batch_size', type=int, default=8)
     parser.add_argument('--num_workers', type=int, default=16)
     parser.add_argument('--image_size', type=int, default=512, help='image size')
@@ -54,7 +54,7 @@ def get_args():
     parser.add_argument('--optimizer', type=str, default='adam', choices=['adam', 'sgd', 'adamw'], help='')
     parser.add_argument('--dice_weight', type=float, default=0.8)
     parser.add_argument('--lr', type=float, default=1e-4, help='learning rate')
-    parser.add_argument('--weight_decay', type=float, default=1e-3, help='learning rate')
+    parser.add_argument('--weight_decay', type=float, default=1e-4, help='learning rate')
     parser.add_argument('--num_tokens', type=int, default=4, help='the num of prompts') 
     parser.add_argument('--vis', type=bool, default=False, help='whether to visualise results')
     
@@ -195,7 +195,8 @@ def train(args):
             images = batch_input['images'].cuda()
             images = F.interpolate(images, (resolution, resolution), mode='bilinear', align_corners=False)  
             
-            outputs, prototypes, class_embeddings, cls_ids = model(images, masks, mode='train')
+            outputs, prototypes, sam_feats, feat_list, cls_ids = model(images, masks, mode='train')
+            class_embeddings = cal_cls_embedding(sam_feats, masks, feat_list, feat_size)
             
             # compute loss     
             seg_loss = dice_loss_model(outputs['preds'], masks.squeeze(1).to(torch.long))
@@ -233,7 +234,7 @@ def train(args):
                 images = batch_input['images'].cuda()
                 images = F.interpolate(images, (resolution, resolution), mode='bilinear', align_corners=False)
                 
-                outputs, _, _, _ = model(images, masks, mode='test')
+                outputs, _, _, _, _ = model(images, masks, mode='test')
                 preds = outputs['preds'] 
                 preds = torch.argmax(torch.softmax(preds, dim=1), dim=1).squeeze(0) # [b, 512, 512]
 

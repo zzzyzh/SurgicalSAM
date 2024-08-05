@@ -137,7 +137,7 @@ def test(args):
             images = batch_input['images'].cuda()
             images = F.interpolate(images, (resolution, resolution), mode='bilinear', align_corners=False)
             
-            outputs, _, _, _ = model(images, masks, mode='test')
+            outputs, _, _, _, _ = model(images, masks, mode='test')
             preds = outputs['preds'] 
             preds = torch.argmax(torch.softmax(preds, dim=1), dim=1).squeeze(0) # [b, 512, 512]
 

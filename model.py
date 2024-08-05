@@ -28,7 +28,6 @@ class Few_Shot_SAM(nn.Module):
         self.num_classes = num_classes
         self.sam_mode = sam_mode
         self.model_type = model_type
-        self.feat_size = feat_size
         self.image_encoder, self.prompt_encoder, self.mask_decoder = sam_model_registry[sam_mode](checkpoint=sam_checkpoint, model_type=model_type, image_size=resolution, num_classes=num_classes)             
         
         print("======> Load Prototypes and Prototype-based Prompt Encoder" )
@@ -72,7 +71,6 @@ class Few_Shot_SAM(nn.Module):
         feat_list = [np.array(cls_id.detach().cpu()).astype(np.uint8) for cls_id in cls_ids]
         cls_ids = torch.concat(cls_ids, dim=0).to(torch.long) # [b']
         sam_feats = torch.concat(sam_feats, dim=0) # [b', 1024, 256]
-        cls_embeddings = cal_cls_embedding(sam_feats, gts, feat_list, self.feat_size)
         
         _, dense_embeddings, sparse_embeddings = self.prototype_prompt_encoder(sam_feats, prototypes, cls_ids)
         sam_feats = rearrange(sam_feats, 'b (h w) c -> b c h w', h=self.feat_size, w=self.feat_size)
@@ -122,13 +120,12 @@ class Few_Shot_SAM(nn.Module):
             'iou_predictions': iou_predictions
         }
         
-        return outputs, prototypes, cls_embeddings, cls_ids
+        return outputs, prototypes, sam_feats, feat_list, cls_ids
 
 
-def cal_cls_embedding(sam_feats, masks, cls_ids, feat_size):
-    sam_feats = rearrange(sam_feats, 'b (h w) c -> b c h w', h=feat_size, w=feat_size)
-    sam_feats = F.interpolate(sam_feats.to(torch.float32), size=(feat_size*2, feat_size*2), mode='bilinear')
-    masks = F.interpolate(masks.to(torch.float32), size=(feat_size*2, feat_size*2), mode='nearest')
+def cal_cls_embedding(sam_feats, masks, cls_ids, feat_size):    
+    sam_feats = F.interpolate(sam_feats.to(torch.float32), size=(feat_size*8, feat_size*8), mode='bilinear')
+    masks = F.interpolate(masks.to(torch.float32), size=(feat_size*8, feat_size*8), mode='nearest')
     class_embeddings, i = [], 0
     
     for mask, ids in zip(masks, cls_ids):
