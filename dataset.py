@@ -114,10 +114,6 @@ class TrainingDataset(Dataset):
             angle = rotate_angle * random.random() * (random.random()>0.5)
             image = TF.rotate(image, angle)
             mask = TF.rotate(mask, angle)
-        # Colour jitter
-        else :
-            colour_jitter = F.ColorJitter(brightness=colour_factor, contrast=colour_factor, saturation=colour_factor)
-            image = colour_jitter(image)
             
         return image, mask
         

@@ -183,7 +183,7 @@ def test(args):
                 images = batch_input['images'].cuda()
                 images = F.interpolate(images, (resolution, resolution), mode='bilinear', align_corners=False)
 
-                image_embeddings, _ = model.image_encoder(images) # [b, 256, featsize, featsize]
+                image_embeddings = model.image_encoder(images) # [b, 256, featsize, featsize]
                 image_embeddings = rearrange(image_embeddings, 'b c h w -> b (h w) c')
         
                 cls_ids = []

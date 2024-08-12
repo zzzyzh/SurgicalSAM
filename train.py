@@ -46,13 +46,13 @@ def get_args():
 
     # Training Strategy
     parser.add_argument('--scale', type=float, default=0.1, help='percentage of training data')
-    parser.add_argument('--num_epochs', type=int, default=200, help='the num of epochs')
+    parser.add_argument('--num_epochs', type=int, default=300, help='the num of epochs')
     parser.add_argument('--batch_size', type=int, default=8)
     parser.add_argument('--num_workers', type=int, default=16)
     parser.add_argument('--image_size', type=int, default=512, help='image size')
     parser.add_argument('--resolution', type=int, default=512, choices=[256, 512], help='input size of the model')
     parser.add_argument('--optimizer', type=str, default='adam', choices=['adam', 'sgd', 'adamw'], help='')
-    parser.add_argument('--dice_weight', type=float, default=0.8)
+    parser.add_argument('--dice_weight', type=float, default=0.9)
     parser.add_argument('--lr', type=float, default=1e-4, help='learning rate')
     parser.add_argument('--weight_decay', type=float, default=1e-4, help='learning rate')
     parser.add_argument('--num_tokens', type=int, default=4, help='the num of prompts') 
