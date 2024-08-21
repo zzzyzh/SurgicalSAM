@@ -15,73 +15,75 @@ def cal_loss(pred, gt, dice_loss_model, focal_loss_model, dice_weight:float=0.8)
     return loss
     
 
-def set_one_hot(pred, gt):
-    _, num_cls, _, _ = pred.shape
-    pred = torch.softmax(pred, dim=1)
-    gt = F.one_hot(gt.squeeze(1).to(torch.long), num_cls).permute(0,3,1,2)
-
-    return pred, gt
-
-
 # Segment Loss funcation
-# https://github.com/OpenGVLab/SAM-Med2D/blob/main/utils.py
-class FocalLoss(nn.Module):
-    def __init__(self, gamma=3.0, alpha=0.25):
-        super(FocalLoss, self).__init__()
-        self.gamma = gamma
-        self.alpha = alpha
-
-    def forward(self, pred, mask):
-        """
-        pred: [B, C, H, W]
-        mask: [B, C, H, W]
-        """
-        pred, mask = set_one_hot(pred, mask)
-        assert pred.shape == mask.shape, "pred and mask should have the same shape."
-        focal_loss = 0.0
-        
-        _, num_cls, _, _ = mask.shape
-        for i in range(num_cls):
-            p, m = pred[:, i], mask[:, i]
-            num_pos = torch.sum(m)
-            num_neg = m.numel() - num_pos
-            w_pos = (1 - p) ** self.gamma
-            w_neg = p ** self.gamma
-
-            loss_pos = -self.alpha * m * w_pos * torch.log(p + 1e-12)
-            loss_neg = -(1 - self.alpha) * (1 - m) * w_neg * torch.log(1 - p + 1e-12)
-
-            loss = (torch.sum(loss_pos) + torch.sum(loss_neg)) / (num_pos + num_neg + 1e-12)
-            focal_loss = focal_loss + loss
-
-        focal_loss = focal_loss / num_cls
-        return focal_loss
-
-
 class DiceLoss(nn.Module):
-    def __init__(self, smooth=1e-3):
+    def __init__(self, ignore_index=None, smooth=1e-5):
+        """
+        Initialize DiceLoss.
+        :param ignore_index: Class index to ignore, e.g., the background class. None means no class is ignored.
+        :param smooth: Smoothing factor to prevent division by zero.
+        """
         super(DiceLoss, self).__init__()
+        self.ignore_index = ignore_index
         self.smooth = smooth
 
     def forward(self, pred, mask):
         """
-        pred: [B, C, H, W]
-        mask: [B, C, H, W]
+        Compute the Dice Loss.
+        :param pred: Model predictions, shape [B, C, H, W]
+        :param mask: Ground truth labels, shape [B, H, W]
+        :param softmax: Whether to apply softmax to the predictions
         """
-        pred, mask = set_one_hot(pred, mask)
-        assert pred.shape == mask.shape, "pred and mask should have the same shape."
-        dice_loss = 0.0
         
-        _, num_cls, _, _ = mask.shape
-        for i in range(num_cls):
-            p, m = pred[:, i], mask[:, i]
-            intersection = torch.sum(p * m)
-            union = torch.sum(p*p) + torch.sum(m*m)
-            loss = 1 - (2 * intersection + self.smooth) / (union + self.smooth)
-            dice_loss = dice_loss + loss
+        pred = F.softmax(pred, dim=1)
+        num_classes = pred.shape[1]
+        mask = F.one_hot(mask, num_classes).permute(0, 3, 1, 2).float()  # Convert to one-hot encoding
         
-        dice_loss = dice_loss / num_cls
-        return dice_loss
+        if self.ignore_index is not None:
+            mask = mask[:, 1:, ...]  # Ignore the class specified by self.ignore_index
+            pred = pred[:, 1:, ...]
+
+        intersection = torch.sum(pred * mask, dim=(0, 2, 3))
+        union = torch.sum(pred * pred, dim=(0, 2, 3)) + torch.sum(mask * mask, dim=(0, 2, 3))
+        dice_score = 2.0 * intersection / (union + self.smooth)
+        
+        loss = 1 - dice_score
+        return loss.mean()  # Return the average Dice Loss
+
+
+class FocalLoss(nn.Module):
+    def __init__(self, alpha=0.25, gamma=2, num_classes=9):
+        super(FocalLoss, self).__init__()
+        assert 0 <= alpha < 1, "alpha should be in [0, 1)"
+        self.alpha = torch.tensor([alpha] + [1 - alpha] * (num_classes - 1))
+        self.gamma = gamma
+        self.num_classes = num_classes
+
+    def forward(self, preds, labels):
+        """
+        Calculate focal loss for segmentation
+        :param preds: predictions from the model, shape: [B, C, H, W]
+        :param labels: ground truth labels, shape: [B, H, W]
+        :return: computed focal loss
+        """
+        if not preds.shape[1] == self.num_classes:
+            raise ValueError(f"Expected input tensor to have {self.num_classes} channels, got {preds.shape[1]}")
+        
+        preds = preds.permute(0, 2, 3, 1).contiguous()  # [B, H, W, C]
+        preds = preds.view(-1, self.num_classes)  # Flatten [N, C] where N is B*H*W
+        labels = labels.view(-1)  # Flatten label tensor
+        
+        preds_logsoft = F.log_softmax(preds, dim=1)  # Log softmax on the class dimension
+        preds_softmax = torch.exp(preds_logsoft)  # softmax
+
+        preds_softmax = preds_softmax.gather(1, labels.unsqueeze(1)).squeeze(1)
+        preds_logsoft = preds_logsoft.gather(1, labels.unsqueeze(1)).squeeze(1)
+        
+        self.alpha = self.alpha.to(preds.device)  # Ensure alpha is on the correct device
+        alpha = self.alpha.gather(0, labels)
+        
+        loss = -alpha * torch.pow((1 - preds_softmax), self.gamma) * preds_logsoft
+        return loss.mean()
 
 
 class MaskIoULoss(nn.Module):

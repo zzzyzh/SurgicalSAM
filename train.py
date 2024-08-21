@@ -56,7 +56,6 @@ def get_args():
     parser.add_argument('--lr', type=float, default=1e-4, help='learning rate')
     parser.add_argument('--weight_decay', type=float, default=1e-4, help='learning rate')
     parser.add_argument('--num_tokens', type=int, default=4, help='the num of prompts') 
-    parser.add_argument('--vis', type=bool, default=False, help='whether to visualise results')
     
     parser.add_argument('--debug', type=bool, default=False, help='whether to use debug mode')
 
@@ -73,8 +72,6 @@ def train(args):
     num_epochs = args.num_epochs
     batch_size = args.batch_size
     num_workers = args.num_workers
-
-    vis = args.vis
 
     # set seed for reproducibility 
     random.seed(seed)
@@ -147,10 +144,8 @@ def train(args):
     writer = SummaryWriter(osp.join(save_dir, 'runs'))             
     save_log_dir = osp.join(save_dir, 'log')
     save_ckpt_dir = osp.join(save_dir, 'ckpt')
-    save_pred_dir = osp.join(save_dir, 'pred', 'val')
     os.makedirs(save_ckpt_dir, exist_ok=True) 
     os.makedirs(save_log_dir, exist_ok=True) 
-    os.makedirs(save_pred_dir, exist_ok=True) 
      
     loggers = get_logger(os.path.join(save_log_dir, f'{task}.log'))
     loggers.info(f'Args: {args}')  
@@ -159,7 +154,7 @@ def train(args):
     #         loggers.info(name) 
                     
     print('======> Define Optmiser and Loss')
-    dice_loss_model = DiceLoss().cuda()
+    dice_loss_model = DiceLoss(ignore_index=0).cuda()
     # focal_loss_model = FocalLoss().cuda()
     contrastive_loss_model = losses.NTXentLoss(temperature=0.07).cuda()
     
@@ -255,11 +250,6 @@ def train(args):
         loggers.info(f'Dice_Results: {dice_results}.')
         writer.add_scalar(tag='val/iou', scalar_value=iou_results['IoU'], global_step=epoch)
         writer.add_scalar(tag='val/dice', scalar_value=dice_results['Dice'], global_step=epoch)     
-        
-        if vis and (epoch+1)%(num_epochs//4) == 0:
-            save_epoch_dir = osp.join(save_pred_dir, f'epoch_{epoch+1}')
-            os.makedirs(save_epoch_dir, exist_ok=True)
-            vis_pred(val_masks, gt_masks, save_epoch_dir, num_classes)
         
         if dice_results['Dice'] > best_dice_val:
             best_dice_val = dice_results['Dice']

@@ -19,8 +19,8 @@ def eval_metrics(eval_masks, gt_eval_masks, num_classes=4, volume=False):
     all_im_iou_acc = [] 
     all_im_dice_acc = []
     
-    class_ious = {c: [] for c in range(1, num_classes+1)}
-    class_dices = {c: [] for c in range(1, num_classes+1)}
+    class_ious = {c: [] for c in range(1, num_classes)}
+    class_dices = {c: [] for c in range(1, num_classes)}
     cum_I, cum_U = 0, 0
     
     for file_name, prediction in eval_masks.items():
@@ -43,7 +43,7 @@ def eval_metrics(eval_masks, gt_eval_masks, num_classes=4, volume=False):
             continue
 
         # loop through all classes from 1 to num_classes 
-        for class_id in range(1, num_classes+1): 
+        for class_id in range(1, num_classes): 
 
             current_pred = (prediction == class_id).astype(np.float64)
             current_target = (full_mask.numpy() == class_id).astype(np.float64)
@@ -73,7 +73,7 @@ def eval_metrics(eval_masks, gt_eval_masks, num_classes=4, volume=False):
     
     dice_per_class = []
     cIoU_per_class = []
-    for c in range(1, num_classes + 1):
+    for c in range(1, num_classes):
         final_class_im_dice = torch.tensor(class_dices[c]).float().mean()
         dice_per_class.append(round((final_class_im_dice*100).item(), 2))
         final_class_im_iou = torch.tensor(class_ious[c]).float().mean()
