@@ -154,7 +154,7 @@ def train(args):
     #         loggers.info(name) 
                     
     print('======> Define Optmiser and Loss')
-    dice_loss_model = DiceLoss(ignore_index=0).cuda()
+    dice_loss_model = DiceLoss().cuda()
     # focal_loss_model = FocalLoss().cuda()
     contrastive_loss_model = losses.NTXentLoss(temperature=0.07).cuda()
     
