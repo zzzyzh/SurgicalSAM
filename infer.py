@@ -154,72 +154,70 @@ def test(args):
         writer.writerow(iou_csv)
         writer.writerow(dice_csv)
         
-    if volume:
-        metric_hd95 = []
-        for i in range(1, num_classes+1):
-            metric_cls_hd95 = []
-            for key in val_masks.keys():   
-                metric_cls_hd95.append(compute_hd95(val_masks[key]==i, gt_masks[key]==i))
-            metric_hd95.append(np.mean(metric_cls_hd95, axis=0))
-        hd95 = np.mean(metric_hd95, axis=0)
-        loggers.info(f'HD95: {round(hd95, 2)}.')
-    
     if vis:
         vis_pred(val_masks, gt_masks, save_pred_dir, num_classes)
+       
+    # if volume:
+    #     metric_hd95 = []
+    #     for i in range(1, num_classes+1):
+    #         metric_cls_hd95 = []
+    #         for key in val_masks.keys():   
+    #             metric_cls_hd95.append(compute_hd95(val_masks[key]==i, gt_masks[key]==i))
+    #         metric_hd95.append(np.mean(metric_cls_hd95, axis=0))
+    #     hd95 = np.mean(metric_hd95, axis=0)
+    #     loggers.info(f'HD95: {round(hd95, 2)}.')
+ 
+    # if args.tsne:
+    #     from einops import rearrange
         
-    if args.tsne:
-        from einops import rearrange
+    #     tsne_path = os.path.join(save_dir, 'tsne')
+    #     tsne_runner = RunTsne(dataset_name=dataset_name,
+    #                           num_class=num_classes,
+    #                           output_dir=tsne_path)
         
-        tsne_path = os.path.join(save_dir, 'tsne')
-        tsne_runner = RunTsne(dataset_name=dataset_name,
-                              num_class=num_classes,
-                              output_dir=tsne_path)
-        
-        with torch.no_grad():
-            tbar = tqdm((test_dataloader), total = len(test_dataloader), leave=False)
+    #     with torch.no_grad():
+    #         tbar = tqdm((test_dataloader), total = len(test_dataloader), leave=False)
                 
-            for batch_input in tbar:   
-                masks = batch_input['masks'].cuda() 
-                images = batch_input['images'].cuda()
-                images = F.interpolate(images, (resolution, resolution), mode='bilinear', align_corners=False)
+    #         for batch_input in tbar:   
+    #             masks = batch_input['masks'].cuda() 
+    #             images = batch_input['images'].cuda()
+    #             images = F.interpolate(images, (resolution, resolution), mode='bilinear', align_corners=False)
 
-                image_embeddings = model.image_encoder(images) # [b, 256, featsize, featsize]
-                image_embeddings = rearrange(image_embeddings, 'b c h w -> b (h w) c')
+    #             image_embeddings = model.image_encoder(images) # [b, 256, featsize, featsize]
+    #             image_embeddings = rearrange(image_embeddings, 'b c h w -> b (h w) c')
         
-                cls_ids = []
-                for gt in masks:
-                    unique = torch.unique(gt)
-                    cls_ids.append(unique[1:])
+    #             cls_ids = []
+    #             for gt in masks:
+    #                 unique = torch.unique(gt)
+    #                 cls_ids.append(unique[1:])
                 
-                sam_feats = []
-                for i in range(len(cls_ids)):
-                    image_embedding = torch.stack([image_embeddings[i] for _ in range(len(cls_ids[i]))], dim=0)
-                    sam_feats.append(image_embedding)
+    #             sam_feats = []
+    #             for i in range(len(cls_ids)):
+    #                 image_embedding = torch.stack([image_embeddings[i] for _ in range(len(cls_ids[i]))], dim=0)
+    #                 sam_feats.append(image_embedding)
                 
-                feat_list = [np.array(cls_id.detach().cpu()).astype(np.uint8) for cls_id in cls_ids]
-                cls_ids = torch.concat(cls_ids, dim=0).to(torch.long) # [b']
-                sam_feats = torch.concat(sam_feats, dim=0) # [b', 1024, 256] 
+    #             feat_list = [np.array(cls_id.detach().cpu()).astype(np.uint8) for cls_id in cls_ids]
+    #             cls_ids = torch.concat(cls_ids, dim=0).to(torch.long) # [b']
+    #             sam_feats = torch.concat(sam_feats, dim=0) # [b', 1024, 256] 
                         
-                prototypes = model.learnable_prototypes_model() # [cls, 256]
-                sam_prototype_feats, _, _ = model.prototype_prompt_encoder(sam_feats, prototypes, cls_ids)
+    #             prototypes = model.learnable_prototypes_model() # [cls, 256]
+    #             sam_prototype_feats, _, _ = model.prototype_prompt_encoder(sam_feats, prototypes, cls_ids)
 
-                i = 0
-                sam_feats = []
-                for cls_id in feat_list:
-                    mask_slice = slice(i, i+len(cls_id))
-                    feats = sam_prototype_feats[mask_slice]
-                    feats = torch.mean(feats, dim=0)
-                    sam_feats.append(feats.unsqueeze(0))  
+    #             i = 0
+    #             sam_feats = []
+    #             for cls_id in feat_list:
+    #                 mask_slice = slice(i, i+len(cls_id))
+    #                 feats = sam_prototype_feats[mask_slice]
+    #                 feats = torch.mean(feats, dim=0)
+    #                 sam_feats.append(feats.unsqueeze(0))  
                     
-                    i += len(cls_id)
+    #                 i += len(cls_id)
                 
-                sam_feats = torch.concat(sam_feats, dim=0).cuda() # [b, 32, 128, 128]
+    #             sam_feats = torch.concat(sam_feats, dim=0).cuda() # [b, 32, 128, 128]
 
-                tsne_runner.input2basket(sam_feats, masks.squeeze(1).to(torch.long), dataset_name)  
+    #             tsne_runner.input2basket(sam_feats, masks.squeeze(1).to(torch.long), dataset_name)  
                 
-        tsne_runner.draw_tsne([dataset_name], plot_memory=False, clscolor=True)
-             
-
+    #     tsne_runner.draw_tsne([dataset_name], plot_memory=False, clscolor=True)
 
 
 if __name__ == '__main__':

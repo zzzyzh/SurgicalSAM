@@ -122,6 +122,7 @@ def train(args):
     data_root_dir = osp.join(args.data_root_dir, args.task, args.dataset)
     train_dataset = TrainingDataset(
                         data_root_dir = data_root_dir,
+                        scale = scale
                     )
     val_dataset = TestingDataset(
                         data_root_dir = data_root_dir,

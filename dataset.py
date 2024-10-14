@@ -24,7 +24,7 @@ SABS_TRAIN_LIST = ["0004", "0005", "0006", "0008", "0009", "0010", "0012", "0013
 
 class TrainingDataset(Dataset):
     def __init__(self, 
-                data_root_dir = "/home/yanzhonghao/data/ven/bhx_sammed", 
+                data_root_dir = "../../data/ven/bhx_sammed", 
                 image_size = 512,
                 scale = 0.1,
                 ):
@@ -32,11 +32,10 @@ class TrainingDataset(Dataset):
         self.image_size = image_size       
 
         # directory
-        self.dataset = data_root_dir.split('/')[-1]
         self.image_dir = osp.join(data_root_dir, 'train', "images")
         self.mask_dir = osp.join(data_root_dir, 'train', "masks")
         
-        self.support = self.get_support(scale)
+        self.support = self.get_support(data_root_dir, scale)
         
         # normalization
         self.pixel_mean=[123.675, 116.28, 103.53]
@@ -53,7 +52,7 @@ class TrainingDataset(Dataset):
         
         image = cv2.imread(image_path, cv2.COLOR_BGR2RGB)
         mask = cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE)
-        
+
         image = Image.fromarray(image)
         mask = Image.fromarray(mask)
         
@@ -61,7 +60,9 @@ class TrainingDataset(Dataset):
         image, mask = np.asarray(image), np.asarray(mask)
                 
         image = torch.tensor(image).to(torch.float32)
-        image = (image - torch.tensor(self.pixel_mean).view(-1, 1, 1)) / torch.tensor(self.pixel_std).view(-1, 1, 1)
+        image = repeat(image[np.newaxis, :, :], 'c h w -> (repeat c) h w', repeat=3)
+        image = image / 255.0
+        # image = (image - torch.tensor(self.pixel_mean).view(-1, 1, 1)) / torch.tensor(self.pixel_std).view(-1, 1, 1)
         mask = torch.tensor(mask).unsqueeze(0).to(torch.float32)
 
         batch_input = {
@@ -71,18 +72,15 @@ class TrainingDataset(Dataset):
         
         return batch_input
 
-    def get_support(self, scale):
-        if 'bhx' in self.dataset:
-            support_idx = random.sample(BHX_TRAIN_LIST, int(len(BHX_TRAIN_LIST)*scale)+1)
-        elif 'sabs' in self.dataset:
-            support_idx = random.sample(SABS_TRAIN_LIST, int(len(SABS_TRAIN_LIST)*scale)+2)
+    def get_support(self, data_root_dir, scale):
         
-        pat_list = sorted(os.listdir(self.mask_dir))
-        pat_idx = [im_name for im_name in pat_list if im_name.split('_')[1] in support_idx]        
-        slice_idx = random.sample(pat_idx, math.ceil(len(pat_list)*scale))
+        dataset = data_root_dir.split('/')[-1]
+        with open(osp.join(data_root_dir, 'lists', f'{dataset}_{str(int(scale * 100))}.txt'), 'r') as f:
+            slice_idx = f.readlines()
 
-        return sorted(slice_idx)
-    
+        slice_idx = [line.strip() for line in slice_idx]
+        return slice_idx
+
     def augmentation(
             self, 
             image, 
@@ -120,7 +118,7 @@ class TrainingDataset(Dataset):
 
 class TestingDataset(Dataset):
     def __init__(self, 
-                 data_root_dir = "/home/yanzhonghao/data/ven/bhx_sammed", 
+                 data_root_dir = "../../data/ven/bhx_sammed", 
                  mode = "test", 
                  image_size = 512,
                  ):
@@ -150,7 +148,9 @@ class TestingDataset(Dataset):
         mask = cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE)
 
         image = torch.tensor(image).to(torch.float32)
-        image = (image - torch.tensor(self.pixel_mean).view(-1, 1, 1)) / torch.tensor(self.pixel_std).view(-1, 1, 1)
+        image = repeat(image[np.newaxis, :, :], 'c h w -> (repeat c) h w', repeat=3)
+        image = image / 255.0
+        # image = (image - torch.tensor(self.pixel_mean).view(-1, 1, 1)) / torch.tensor(self.pixel_std).view(-1, 1, 1)
         mask = torch.tensor(mask).unsqueeze(0).to(torch.float32)
 
         batch_input = {

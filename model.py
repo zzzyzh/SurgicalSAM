@@ -28,7 +28,7 @@ class Few_Shot_SAM(nn.Module):
         self.num_classes = num_classes
         self.sam_mode = sam_mode
         self.model_type = model_type
-        self.image_encoder, self.prompt_encoder, self.mask_decoder = sam_model_registry[sam_mode](checkpoint=sam_checkpoint, model_type=model_type, image_size=resolution, num_classes=num_classes)             
+        self.image_encoder, self.prompt_encoder, self.mask_decoder = sam_model_registry[sam_mode](checkpoint=sam_checkpoint, model_type=model_type, image_size=resolution, num_classes = num_classes)             
         
         print("======> Load Prototypes and Prototype-based Prompt Encoder" )
         self.feat_size = feat_size
@@ -97,8 +97,8 @@ class Few_Shot_SAM(nn.Module):
             low_res_mask = low_res_masks_list[mask_slice].squeeze(1)
             iou_prediction = iou_predictions_list[mask_slice]
 
-            mask = torch.zeros(self.num_classes+1, low_res_mask.shape[1], low_res_mask.shape[2])
-            iou_pred = torch.zeros(self.num_classes+1)
+            mask = torch.zeros(self.num_classes, low_res_mask.shape[1], low_res_mask.shape[2])
+            iou_pred = torch.zeros(self.num_classes)
 
             for j in range(len(cls_id)):
                 mask[cls_id[j]] = low_res_mask[j]
@@ -124,8 +124,8 @@ class Few_Shot_SAM(nn.Module):
 
 
 def cal_cls_embedding(sam_feats, masks, cls_ids, feat_size):    
-    sam_feats = F.interpolate(sam_feats.to(torch.float32), size=(feat_size*8, feat_size*8), mode='bilinear')
-    masks = F.interpolate(masks.to(torch.float32), size=(feat_size*8, feat_size*8), mode='nearest')
+    sam_feats = F.interpolate(sam_feats.to(torch.float32), size=(256, 256), mode='bilinear')
+    masks = F.interpolate(masks.to(torch.float32), size=(256, 256), mode='nearest')
     class_embeddings, i = [], 0
     
     for mask, ids in zip(masks, cls_ids):
